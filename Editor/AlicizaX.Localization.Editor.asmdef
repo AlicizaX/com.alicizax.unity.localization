@@ -1,0 +1,24 @@
+{
+  "name": "AlicizaX.Localization.Editor",
+  "rootNamespace": "AlicizaX.Localization.Editor",
+  "references": [
+    "GUID:f73cdb79ed244aaea16d93242086c857",
+    "GUID:724cac821c6546fbb22adc88ac13bb71",
+    "GUID:1619e00706139ce488ff80c0daeea8e7",
+    "GUID:fb064c8bf96bac94e90d2f39090daa94",
+    "GUID:6055be8ebefd69e48b49212b09b47b2f",
+    "AlicizaX.Luban.Runtime",
+    "AlicizaX.EditorExtension.Editor"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

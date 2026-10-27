@@ -6,26 +6,32 @@ namespace AlicizaX.Localization.Runtime
 {
     public sealed class LocalizationProvider
     {
-        private readonly Dictionary<string, Dictionary<string, string>> _cache = new(StringComparer.Ordinal);
         private readonly LocalizationSettings _settings;
-        private readonly ILocalizationCatalogSource _baseSource;
-        private ILocalizationCatalogSource _patchSource;
+        private readonly List<ILocalizationCatalogSource> _sources = new List<ILocalizationCatalogSource>();
         private Dictionary<string, string> _strings;
         private bool _loading;
 
         public string Language { get; private set; }
         public int Revision { get; private set; } = 1;
         public IReadOnlyList<string> SupportedLanguages => _settings.Locales;
-        public bool PatchEnabled => _patchSource != null;
 
-        public LocalizationProvider(LocalizationSettings settings, ILocalizationCatalogSource source,
-            string locale, byte[] initialBytes)
+        private LocalizationProvider(LocalizationSettings settings, ILocalizationCatalogSource source,
+            string locale, Dictionary<string, string> strings)
         {
             _settings = settings;
-            _baseSource = source;
-            _strings = LocalizationCatalog.Read(initialBytes);
-            _cache.Add(locale, _strings);
+            _sources.Add(source);
+            _strings = strings;
             Language = locale;
+        }
+
+        public static async UniTask<LocalizationProvider> CreateAsync(LocalizationSettings settings,
+            ILocalizationCatalogSource source, string locale)
+        {
+            if (settings == null) throw new ArgumentNullException(nameof(settings));
+            if (source == null) throw new ArgumentNullException(nameof(source));
+            if (!settings.Supports(locale)) throw new ArgumentException("Unsupported locale: " + locale, nameof(locale));
+            var strings = LocalizationCatalog.Read(await source.LoadAsync(locale));
+            return new LocalizationProvider(settings, source, locale, strings);
         }
 
         public string GetString(string key)
@@ -34,54 +40,48 @@ namespace AlicizaX.Localization.Runtime
             return _strings.TryGetValue(key, out string value) && value != null ? value : key;
         }
 
+        public async UniTask<bool> AddCatalogAsync(ILocalizationCatalogSource source)
+        {
+            if (source == null) throw new ArgumentNullException(nameof(source));
+            if (_loading) return false;
+            _loading = true;
+            try
+            {
+                var added = LocalizationCatalog.Read(await source.LoadAsync(Language));
+                var merged = new Dictionary<string, string>(_strings, StringComparer.Ordinal);
+                MergeUnique(merged, added);
+                _sources.Add(source);
+                _strings = merged;
+                Revision++;
+                return true;
+            }
+            finally { _loading = false; }
+        }
+
         public async UniTask<bool> SetLanguageAsync(string locale)
         {
-            if (!_settings.Supports(locale)) throw new ArgumentException($"Unsupported locale: {locale}", nameof(locale));
+            if (!_settings.Supports(locale)) throw new ArgumentException("Unsupported locale: " + locale, nameof(locale));
             if (_loading) return false;
             if (locale == Language) return true;
             _loading = true;
             try
             {
-                if (!_cache.TryGetValue(locale, out var strings))
-                    strings = await LoadAsync(locale, _patchSource);
-                _cache[locale] = strings;
-                Publish(locale, strings);
+                var merged = new Dictionary<string, string>(StringComparer.Ordinal);
+                foreach (ILocalizationCatalogSource source in _sources)
+                    MergeUnique(merged, LocalizationCatalog.Read(await source.LoadAsync(locale)));
+                _strings = merged;
+                Language = locale;
+                Revision++;
                 return true;
             }
             finally { _loading = false; }
         }
 
-        public async UniTask<bool> MountPatchAsync(ILocalizationCatalogSource source)
+        private static void MergeUnique(Dictionary<string, string> target, Dictionary<string, string> added)
         {
-            if (source == null) throw new ArgumentNullException(nameof(source));
-            if (_loading) return false;
-            if (PatchEnabled) return true;
-            _loading = true;
-            try
-            {
-                var strings = await LoadAsync(Language, source);
-                _patchSource = source;
-                _cache.Clear();
-                _cache.Add(Language, strings);
-                Publish(Language, strings);
-                return true;
-            }
-            finally { _loading = false; }
-        }
-
-        private async UniTask<Dictionary<string, string>> LoadAsync(string locale, ILocalizationCatalogSource patch)
-        {
-            var strings = LocalizationCatalog.Read(await _baseSource.LoadAsync(locale));
-            if (patch != null)
-                LocalizationCatalog.ApplyPatch(strings, LocalizationCatalog.Read(await patch.LoadAsync(locale)));
-            return strings;
-        }
-
-        private void Publish(string locale, Dictionary<string, string> strings)
-        {
-            _strings = strings;
-            Language = locale;
-            Revision++;
+            foreach (var pair in added)
+                if (!target.TryAdd(pair.Key, pair.Value))
+                    throw new InvalidOperationException("Duplicate localization key across catalogs: " + pair.Key);
         }
     }
 }

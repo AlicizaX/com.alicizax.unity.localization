@@ -1,15 +1,12 @@
 {
   "name": "com.alicizax.unity.localization",
   "displayName": "Aliciza X Localization",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "unity": "2022.3",
   "description": "Luban-backed localization runtime, UI bindings and editor preview tools.",
   "dependencies": {
     "com.alicizax.unity.framework": "2.3.21",
-    "com.alicizax.unity.luban": "4.7.0",
     "com.alicizax.unity.cysharp.unitask": "2.5.13",
-    "com.cysharp.zstring": "2.6.0",
-    "com.unity.textmeshpro": "3.0.9",
-    "com.alicizax.unity.editor.extension": "2.0.7"
+    "com.cysharp.zstring": "2.6.0"
   }
 }

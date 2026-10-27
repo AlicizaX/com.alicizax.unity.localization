@@ -6,36 +6,23 @@ namespace AlicizaX.Localization.Runtime
     [Serializable]
     public sealed class LocalizationSettings
     {
-        public const string ResourcePath = "Localization/Settings";
         public const string EditorLanguagePrefsKey = "AlicizaX.Localization.Editor.Language";
 
         public string[] Locales;
         public string DefaultLocale;
-        public string ResourcePrefix;
-        public string PatchAddressPrefix;
 
-        private static LocalizationSettings _current;
-        private static bool _loaded;
-
-        public static LocalizationSettings Current
+        public static LocalizationSettings Parse(string json)
         {
-            get
-            {
-                if (_loaded) return _current;
-                _loaded = true;
-                TextAsset asset = Resources.Load<TextAsset>(ResourcePath);
-                if (asset == null) return null;
-                _current = JsonUtility.FromJson<LocalizationSettings>(asset.text);
-                Resources.UnloadAsset(asset);
-                if (_current != null && _current.Locales == null) _current.Locales = Array.Empty<string>();
-                return _current;
-            }
-        }
-
-        public static void Reload()
-        {
-            _current = null;
-            _loaded = false;
+            if (string.IsNullOrWhiteSpace(json)) throw new ArgumentException("Localization options are empty.", nameof(json));
+            var settings = JsonUtility.FromJson<LocalizationSettings>(json);
+            if (settings?.Locales == null || settings.Locales.Length == 0 ||
+                string.IsNullOrEmpty(settings.DefaultLocale) || !settings.Supports(settings.DefaultLocale))
+                throw new FormatException("Localization options require languages and a valid default language.");
+            var seen = new System.Collections.Generic.HashSet<string>(StringComparer.Ordinal);
+            foreach (string locale in settings.Locales)
+                if (string.IsNullOrWhiteSpace(locale) || !seen.Add(locale))
+                    throw new FormatException("Localization languages must be nonempty and unique.");
+            return settings;
         }
 
         public bool Supports(string locale) => Array.IndexOf(Locales, locale) >= 0;

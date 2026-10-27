@@ -1,4 +1,4 @@
-using AlicizaX.Localization.Runtime;
+using AlicizaX.Editor.Toolbar;
 using UnityEditor;
 using UnityEngine;
 #if UNITY_6000_3_OR_NEWER
@@ -22,7 +22,7 @@ namespace AlicizaX.Localization.Editor
             LocalizationRefreshHelper.Changed += () => MainToolbar.Refresh(ElementPath);
             EditorApplication.playModeStateChanged += _ => MainToolbar.Refresh(ElementPath);
 #else
-            OldToolbarMinimalExtender.RegisterRight(ElementPath, CreateDropdown);
+            LegacyToolbarExtender.RegisterRight(ElementPath, 1, CreateDropdown);
 #endif
         }
 
@@ -34,7 +34,7 @@ namespace AlicizaX.Localization.Editor
         private static void ShowMenu(Rect rect)
         {
             var menu = new GenericMenu();
-            foreach (string locale in LanguageTypes.Languages)
+            foreach (string locale in LocalizationRefreshHelper.Languages)
             {
                 if (Application.isPlaying) menu.AddDisabledItem(new GUIContent(locale));
                 else menu.AddItem(new GUIContent(locale), locale == LocalizationRefreshHelper.Language,
@@ -49,13 +49,13 @@ namespace AlicizaX.Localization.Editor
             {
                 GUILayout.BeginHorizontal();
                 var content = new GUIContent(LocalizationRefreshHelper.Language, SettingsIcon, Tooltip);
-                using (new EditorGUI.DisabledScope(Application.isPlaying || LanguageTypes.Languages.Count == 0))
+                using (new EditorGUI.DisabledScope(Application.isPlaying || LocalizationRefreshHelper.Languages.Count == 0))
                 {
                     if (EditorGUILayout.DropdownButton(content, FocusType.Passive, EditorStyles.toolbarPopup,
                             GUILayout.MaxWidth(120)))
                     {
                         var menu = new GenericMenu();
-                        foreach (string locale in LanguageTypes.Languages)
+                        foreach (string locale in LocalizationRefreshHelper.Languages)
                             menu.AddItem(new GUIContent(locale), locale == LocalizationRefreshHelper.Language,
                                 () => LocalizationRefreshHelper.SetLanguage(locale));
                         menu.ShowAsContext();

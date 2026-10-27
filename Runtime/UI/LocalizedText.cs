@@ -1,3 +1,4 @@
+#if TEXTMESHPRO_SUPPORT
 using System;
 using AlicizaX.Localization.Runtime;
 using Cysharp.Text;
@@ -28,7 +29,7 @@ namespace AlicizaX.Localization.UI
         private void OnEnable()
         {
             if (!Application.isPlaying) return;
-            LocalizationKit.LanguageChanged += OnLanguageChanged;
+            LocalizationKit.Changed += OnLanguageChanged;
             _subscribed = true;
             Refresh();
         }
@@ -36,7 +37,7 @@ namespace AlicizaX.Localization.UI
         private void OnDisable()
         {
             if (!_subscribed) return;
-            LocalizationKit.LanguageChanged -= OnLanguageChanged;
+            LocalizationKit.Changed -= OnLanguageChanged;
             _subscribed = false;
         }
 
@@ -91,3 +92,4 @@ namespace AlicizaX.Localization.UI
         }
     }
 }
+#endif

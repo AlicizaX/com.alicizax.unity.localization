@@ -1,7 +1,0 @@
-<module name="Catalog">
-  <bean name="TextEntry">
-    <var name="key" type="string"/>
-    <var name="value" type="string?"/>
-  </bean>
-  <table name="TbText" value="TextEntry" index="key" input="*items@catalog.json"/>
-</module>

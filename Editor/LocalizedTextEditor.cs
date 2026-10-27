@@ -1,9 +1,10 @@
+#if TEXTMESHPRO_SUPPORT
 using System;
+using System.Reflection;
 using AlicizaX.Localization.Runtime;
 using AlicizaX.Localization.UI;
 using TMPro;
 using UnityEditor;
-using UnityEditor.SceneManagement;
 using UnityEngine;
 
 namespace AlicizaX.Localization.Editor
@@ -12,6 +13,9 @@ namespace AlicizaX.Localization.Editor
     [CanEditMultipleObjects]
     internal sealed class LocalizedTextEditor : UnityEditor.Editor
     {
+        private static readonly FieldInfo TextField = typeof(TMP_Text).GetField("m_text", BindingFlags.Instance | BindingFlags.NonPublic);
+        private static readonly FieldInfo BackingDirtyField = typeof(TMP_Text).GetField("m_IsTextBackingStringDirty", BindingFlags.Instance | BindingFlags.NonPublic);
+
         public override void OnInspectorGUI()
         {
             serializedObject.Update();
@@ -59,37 +63,43 @@ namespace AlicizaX.Localization.Editor
 
         internal static void Preview(LocalizedText binding)
         {
-            if (binding == null || Application.isPlaying) return;
+            if (binding == null || Application.isPlaying || EditorUtility.IsPersistent(binding)) return;
             var serialized = new SerializedObject(binding);
             string key = serialized.FindProperty("_key").stringValue;
-            if (string.IsNullOrEmpty(key)) return;
             TMP_Text target = serialized.FindProperty("_target").objectReferenceValue as TMP_Text;
             if (target == null) target = binding.GetComponent<TMP_Text>();
-            if (target == null) return;
+            if (target == null || EditorUtility.IsPersistent(target)) return;
+            if (TextField == null || BackingDirtyField == null)
+                throw new MissingFieldException("TMP preview requires m_text and m_IsTextBackingStringDirty.");
 
-            string format = LocalizationRefreshHelper.GetPreviewLabel(key);
-            SerializedProperty args = serialized.FindProperty("_arguments");
-            object[] values = new object[args.arraySize];
-            for (int i = 0; i < values.Length; i++)
+            string original = (string)TextField.GetValue(target);
+            string text = original ?? string.Empty;
+            if (!string.IsNullOrEmpty(key))
             {
-                values[i] = args.GetArrayElementAtIndex(i).stringValue;
-            }
+                string format = LocalizationRefreshHelper.GetPreviewLabel(key);
+                SerializedProperty args = serialized.FindProperty("_arguments");
+                object[] values = new object[args.arraySize];
+                for (int i = 0; i < values.Length; i++)
+                {
+                    values[i] = args.GetArrayElementAtIndex(i).stringValue;
+                }
 
-            string text;
-            try
-            {
-                text = LocalizationFormatter.Format(format, values);
+                try
+                {
+                    text = LocalizationFormatter.Format(format, values);
+                }
+                catch (FormatException)
+                {
+                    text = format;
+                }
             }
-            catch (FormatException)
-            {
-                text = format;
-            }
-            if (target.text == text) return;
-            Undo.RecordObject(target, "Preview Localization");
-            target.SetText(text);
-            PrefabUtility.RecordPrefabInstancePropertyModifications(target);
-            EditorUtility.SetDirty(target);
-            if (target.gameObject.scene.IsValid()) EditorSceneManager.MarkSceneDirty(target.gameObject.scene);
+            char[] characters = text.ToCharArray();
+            target.SetCharArray(characters, 0, characters.Length);
+            // TMP 3.0.9 assigns m_text inside SetCharArray in the Editor. Restore the
+            // serialized value while retaining the preview characters used by its mesh.
+            TextField.SetValue(target, original);
+            BackingDirtyField.SetValue(target, false);
         }
     }
 }
+#endif

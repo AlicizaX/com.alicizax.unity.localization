@@ -3,10 +3,10 @@
     "rootNamespace": "AlicizaX.Localization",
     "references": [
         "GUID:1619e00706139ce488ff80c0daeea8e7",
-        "GUID:1e70a94ee04d4a25a94d27a4ac3572bf",
         "GUID:f51ebe6a0ceec4240a699833d6309b23",
         "GUID:e34a5702dd353724aa315fb8011f08c3",
-        "GUID:33661e06c33d31b4c9223810bf503247"
+        "GUID:33661e06c33d31b4c9223810bf503247",
+        "GUID:2a81c6962524d424a8ef5072bd3b0fa0"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

@@ -5,7 +5,7 @@ namespace AlicizaX.Localization.Runtime
 {
     public static class LanguageTypes
     {
-        public static IReadOnlyList<string> Languages => LocalizationSettings.Current?.Locales ?? Array.Empty<string>();
+        public static IReadOnlyList<string> Languages => LocalizationKit.SupportedLanguages;
         public static string IndexToString(int index) => index >= 0 && index < Languages.Count ? Languages[index] : string.Empty;
         public static int StringToIndex(string locale)
         {

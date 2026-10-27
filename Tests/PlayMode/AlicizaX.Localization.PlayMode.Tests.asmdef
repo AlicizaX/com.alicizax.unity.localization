@@ -1,0 +1,37 @@
+{
+    "name": "AlicizaX.Localization.PlayMode.Tests",
+    "rootNamespace": "",
+    "references": [
+        "AlicizaX.Localization.Runtime",
+        "AlicizaX.Localization.UI",
+        "UniTask.Runtime",
+        "Unity.TextMeshPro",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner",
+        "Luban.Runtime"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.unity.ugui",
+            "expression": "2.0.0",
+            "define": "TEXTMESHPRO_SUPPORT"
+        },
+        {
+            "name": "com.unity.textmeshpro",
+            "expression": "",
+            "define": "TEXTMESHPRO_SUPPORT"
+        }
+    ],
+    "noEngineReferences": false
+}

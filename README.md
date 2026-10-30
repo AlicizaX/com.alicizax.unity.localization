@@ -14,20 +14,20 @@
 
 ## 2. 生成和检查
 
-首次构建或更新 Luban 工具时，在 `Config` 目录运行 `.\build.bat`（Windows）或 `bash build.sh`（macOS）。需要 .NET 8 SDK、.NET 8 Runtime 和 Git；macOS 还需要 curl。成功后编译产物位于 `Config/Tools`。
+首次构建或更新 Luban 工具时，在 `Config` 目录运行 `.\build.bat`（Windows）或双击 `build.command`（macOS，也可运行 `./build.command`）。需要 .NET 8 SDK、.NET 8 Runtime 和 Git；macOS 还需要 curl。成功后编译产物位于 `Config/Tools`。
 
 在同一目录生成普通表和多语言词库：
 
 ```text
 Windows: .\gen-all.bat
-macOS:   bash gen-all.sh
+macOS:   ./gen-all.command
 ```
 
 提交或构建前检查生成文件是否与表格一致：
 
 ```text
 Windows: .\gen-all.bat --check
-macOS:   bash gen-all.sh --check
+macOS:   ./gen-all.command --check
 ```
 
 本项目可通过 Unity 菜单 **AlicizaX / Config / Generate Config** 运行 `gen-all`，通过 **Check Generated Files** 运行 `--check`。构建前的检查也由项目的 BuildCLI 执行。`gen-all` 将词库相对路径写入 `RuntimeOptions.json`；包内编辑器工具读取它预览文案，无需解析 `config.ini`。`--check` 只比较结果，不修改生成文件。

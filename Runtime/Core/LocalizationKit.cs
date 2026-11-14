@@ -1,11 +1,5 @@
 using System;
 using System.Collections.Generic;
-#if ALICIZAX_BUILD_LOCALE_FILE && !UNITY_EDITOR
-using System.IO;
-#if UNITY_ANDROID || UNITY_WEBGL
-using UnityEngine.Networking;
-#endif
-#endif
 using Cysharp.Text;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
@@ -45,10 +39,7 @@ namespace AlicizaX.Localization.Runtime
                 if (!settings.Supports(locale)) locale = settings.DefaultLocale;
 #else
                 string savedLocale = PlayerPrefs.GetString(LanguagePrefsKey, string.Empty);
-                string buildLocale = null;
-#if ALICIZAX_BUILD_LOCALE_FILE
-                if (!settings.Supports(savedLocale)) buildLocale = await ReadBuildLocaleAsync(settings);
-#endif
+                string buildLocale = settings.Supports(savedLocale) ? null : ReadBuildLocale(settings);
                 string locale = SelectPlayerLocale(settings, savedLocale, buildLocale);
 #endif
                 LocalizationProvider provider = await LocalizationProvider.CreateAsync(settings, firstSource, locale);
@@ -64,35 +55,17 @@ namespace AlicizaX.Localization.Runtime
             return settings.Supports(buildLocale) ? buildLocale : settings.DefaultLocale;
         }
 
-#if ALICIZAX_BUILD_LOCALE_FILE && !UNITY_EDITOR
-        private static async UniTask<string> ReadBuildLocaleAsync(LocalizationSettings settings)
+        private static string ReadBuildLocale(LocalizationSettings settings)
         {
-            string path = Path.Combine(Application.streamingAssetsPath, "AlicizaX/Localization/build-locale.txt");
-            string contents;
-            try
-            {
-#if UNITY_ANDROID || UNITY_WEBGL
-                using (var request = UnityWebRequest.Get(path))
-                {
-                    await request.SendWebRequest();
-                    contents = request.downloadHandler.text;
-                }
-#else
-                contents = File.ReadAllText(path);
-#endif
-            }
-            catch (Exception error)
-            {
-                Debug.LogError($"Failed to read build localization language at {path}: {error}");
+            TextAsset asset = Resources.Load<TextAsset>("AlicizaX/Localization/build-locale");
+            if (asset == null)
                 return null;
-            }
 
-            string locale = contents.Trim();
+            string locale = asset.text.Trim();
             if (settings.Supports(locale)) return locale;
-            Debug.LogError($"Unsupported build localization language at {path}: '{locale}'");
+            Debug.LogError($"Unsupported build localization language: '{locale}'");
             return null;
         }
-#endif
 
         public static string Get(string key) => _provider?.GetString(key) ?? key;
 

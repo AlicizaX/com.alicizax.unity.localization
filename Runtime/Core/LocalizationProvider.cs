@@ -1,87 +1,137 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Cysharp.Threading.Tasks;
+using UnityEngine;
 
 namespace AlicizaX.Localization.Runtime
 {
-    public sealed class LocalizationProvider
+    public sealed class LocalizationProvider : IDisposable
     {
-        private readonly LocalizationSettings _settings;
-        private readonly List<ILocalizationCatalogSource> _sources = new List<ILocalizationCatalogSource>();
-        private Dictionary<string, string> _strings;
-        private bool _loading;
-
-        public string Language { get; private set; }
-        public int Revision { get; private set; } = 1;
-        public IReadOnlyList<string> SupportedLanguages => _settings.Locales;
-
-        private LocalizationProvider(LocalizationSettings settings, ILocalizationCatalogSource source,
-            string locale, Dictionary<string, string> strings)
+        private sealed class Table
         {
-            _settings = settings;
-            _sources.Add(source);
-            _strings = strings;
+            internal string Id;
+            internal ILocalizationTableSource Source;
+            internal LoadedLocalizationTable Loaded;
+            internal Dictionary<string, string> Strings;
+        }
+        private readonly List<Table> _tables = new();
+        private Dictionary<string, string> _strings = new(StringComparer.Ordinal);
+        private readonly string[] _languages;
+        private bool _loading;
+        private LanguageBinding _binding;
+        public string Language { get; private set; }
+        public int Revision { get; private set; }
+        public IReadOnlyList<string> SupportedLanguages => _languages;
+        public IReadOnlyList<LocalizationLanguageTable> LoadedTables => _tables.Select(t => t.Loaded.Asset).ToArray();
+
+        public LocalizationProvider(LocalizationSettings settings, string locale)
+        {
+            _languages = settings.Locales;
             Language = locale;
         }
+        public string GetString(string key) => key != null && _strings.TryGetValue(key, out var value) ? value ?? key : key;
+        public UniTask AddTableAsync(string tableId, ILocalizationTableSource source) => ChangeTableAsync(tableId, source, false);
+        public UniTask ReloadTableAsync(string tableId, ILocalizationTableSource source = null) => ChangeTableAsync(tableId, source, true);
 
-        public static async UniTask<LocalizationProvider> CreateAsync(LocalizationSettings settings,
-            ILocalizationCatalogSource source, string locale)
+        private async UniTask ChangeTableAsync(string id, ILocalizationTableSource source, bool reload)
         {
-            if (settings == null) throw new ArgumentNullException(nameof(settings));
-            if (source == null) throw new ArgumentNullException(nameof(source));
-            if (!settings.Supports(locale)) throw new ArgumentException("Unsupported locale: " + locale, nameof(locale));
-            var strings = LocalizationCatalog.Read(await source.LoadAsync(locale));
-            return new LocalizationProvider(settings, source, locale, strings);
-        }
-
-        public string GetString(string key)
-        {
-            if (string.IsNullOrEmpty(key)) return key;
-            return _strings.TryGetValue(key, out string value) && value != null ? value : key;
-        }
-
-        public async UniTask<bool> AddCatalogAsync(ILocalizationCatalogSource source)
-        {
-            if (source == null) throw new ArgumentNullException(nameof(source));
-            if (_loading) return false;
+            int index = _tables.FindIndex(t => t.Id == id);
+            if (reload ? index < 0 : index >= 0)
+            {
+                Debug.LogError($"Table '{id}' is {(reload ? "not registered" : "already registered")}.");
+                return;
+            }
+            if (_loading)
+            {
+                Debug.LogError("Localization is already loading. Await the current operation first.");
+                return;
+            }
+            if (reload) source ??= _tables[index].Source;
             _loading = true;
             try
             {
-                var added = LocalizationCatalog.Read(await source.LoadAsync(Language));
-                var merged = new Dictionary<string, string>(_strings, StringComparer.Ordinal);
-                MergeUnique(merged, added);
-                _sources.Add(source);
-                _strings = merged;
+                var added = await Load(id, source, Language);
+                var old = reload ? _tables[index] : null;
+                if (reload) _tables[index] = added; else _tables.Add(added);
+                _strings = Merge(_tables);
                 Revision++;
-                return true;
+                old?.Loaded.Dispose();
             }
             finally { _loading = false; }
         }
-
-        public async UniTask<bool> SetLanguageAsync(string locale)
+        private static async UniTask<Table> Load(string id, ILocalizationTableSource source, string locale)
         {
-            if (!_settings.Supports(locale)) throw new ArgumentException("Unsupported locale: " + locale, nameof(locale));
-            if (_loading) return false;
-            if (locale == Language) return true;
-            _loading = true;
+            var loaded = await source.LoadAsync(locale);
             try
             {
-                var merged = new Dictionary<string, string>(StringComparer.Ordinal);
-                foreach (ILocalizationCatalogSource source in _sources)
-                    MergeUnique(merged, LocalizationCatalog.Read(await source.LoadAsync(locale)));
+                if (loaded?.Asset == null || loaded.Asset.TableId != id || loaded.Asset.Locale != locale)
+                    throw new InvalidOperationException($"Localization source did not return {id}/{locale}.");
+                return new Table { Id = id, Source = source, Loaded = loaded, Strings = loaded.Asset.Read() };
+            }
+            catch { loaded?.Dispose(); throw; }
+        }
+        private static Dictionary<string, string> Merge(IEnumerable<Table> tables)
+        {
+            var merged = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var table in tables)
+                foreach (var pair in table.Strings)
+                    if (pair.Value != null) merged[pair.Key] = pair.Value;
+            return merged;
+        }
+        public async UniTask SetLanguageAsync(string locale)
+        {
+            if (Array.IndexOf(_languages, locale) < 0)
+            {
+                Debug.LogError("Unsupported locale: " + locale);
+                return;
+            }
+            if (_loading)
+            {
+                Debug.LogError("Localization is already loading. Await the current operation first.");
+                return;
+            }
+            if (locale == Language) return;
+            _loading = true;
+            var staged = new List<Table>();
+            try
+            {
+                foreach (var table in _tables)
+                    staged.Add(await Load(table.Id, table.Source, locale));
+                var merged = Merge(staged);
+                if (_binding != null) await _binding.Loader(locale);
+                var old = _tables.ToArray();
+                _tables.Clear();
+                _tables.AddRange(staged);
+                staged.Clear();
                 _strings = merged;
                 Language = locale;
                 Revision++;
-                return true;
+                foreach (var table in old) table.Loaded.Dispose();
             }
-            finally { _loading = false; }
+            finally
+            {
+                foreach (var table in staged) table.Loaded.Dispose();
+                _loading = false;
+            }
         }
-
-        private static void MergeUnique(Dictionary<string, string> target, Dictionary<string, string> added)
+        public IDisposable RegisterLanguageLoader(Func<string, UniTask> loader)
         {
-            foreach (var pair in added)
-                if (!target.TryAdd(pair.Key, pair.Value))
-                    throw new InvalidOperationException("Duplicate localization key across catalogs: " + pair.Key);
+            return _binding = new LanguageBinding(this, loader);
+        }
+        private sealed class LanguageBinding : IDisposable
+        {
+            private readonly LocalizationProvider _owner;
+            internal readonly Func<string, UniTask> Loader;
+            internal LanguageBinding(LocalizationProvider owner, Func<string, UniTask> loader) { _owner = owner; Loader = loader; }
+            public void Dispose() { if (_owner._binding == this) _owner._binding = null; }
+        }
+        public void Dispose()
+        {
+            _binding = null;
+            foreach (var table in _tables) table.Loaded.Dispose();
+            _tables.Clear();
+            _strings.Clear();
         }
     }
 }

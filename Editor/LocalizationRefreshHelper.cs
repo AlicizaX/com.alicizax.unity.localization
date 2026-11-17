@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using AlicizaX.Localization.Runtime;
 #if TEXTMESHPRO_SUPPORT
 using AlicizaX.Localization.UI;
@@ -13,15 +12,6 @@ namespace AlicizaX.Localization.Editor
     [InitializeOnLoad]
     internal static class LocalizationRefreshHelper
     {
-        private const string RuntimeOptionsFileName = "RuntimeOptions.json";
-
-        [Serializable]
-        private sealed class RuntimeOptions
-        {
-            public int Version;
-            public string[] Catalogs;
-        }
-
         private static Dictionary<string, string> _entries = new Dictionary<string, string>(StringComparer.Ordinal);
         private static LocalizationSettings _settings;
         private static bool _dirty = true;
@@ -31,6 +21,7 @@ namespace AlicizaX.Localization.Editor
         static LocalizationRefreshHelper()
         {
             EditorApplication.projectChanged += InvalidateCache;
+            Undo.undoRedoPerformed += InvalidateCache;
             EditorApplication.hierarchyChanged += ScheduleRefreshOpenPreviews;
             ScheduleRefreshOpenPreviews();
         }
@@ -71,7 +62,7 @@ namespace AlicizaX.Localization.Editor
             InvalidateCache();
         }
 
-        internal static string GetPreviewLabel(string key) => key != null && EntriesByKey.TryGetValue(key, out var value)
+        internal static string GetPreviewLabel(string key) => Application.isPlaying ? LocalizationKit.Get(key) : key != null && EntriesByKey.TryGetValue(key, out var value)
             ? value ?? key : key;
 
         private static string CurrentLanguage(LocalizationSettings settings)
@@ -81,58 +72,42 @@ namespace AlicizaX.Localization.Editor
             return settings.Supports(language) ? language : settings.DefaultLocale;
         }
 
-        private static string FindRuntimeOptions()
+        internal static List<LocalizationTableCollection> PreviewTables
         {
-            var matches = new List<string>();
-            foreach (string guid in AssetDatabase.FindAssets("RuntimeOptions", new[] { "Assets" }))
+            get
             {
-                string path = AssetDatabase.GUIDToAssetPath(guid);
-                if (string.Equals(Path.GetFileName(path), RuntimeOptionsFileName, StringComparison.Ordinal))
-                    matches.Add(path);
+                var result = new List<LocalizationTableCollection>();
+                foreach (string guid in SessionState.GetString("AlicizaX.Localization.PreviewTables", "").Split(';'))
+                {
+                    var table = AssetDatabase.LoadAssetAtPath<LocalizationTableCollection>(AssetDatabase.GUIDToAssetPath(guid));
+                    if (table != null) result.Add(table);
+                }
+                return result;
             }
-            if (matches.Count == 0) return null;
-            if (matches.Count > 1)
-            {
-                matches.Sort(StringComparer.Ordinal);
-                throw new InvalidOperationException("Multiple localization runtime options found: " + string.Join(", ", matches));
-            }
-            return matches[0];
         }
+        internal static void SetPreviewTables(List<LocalizationTableCollection> tables)
+        {
+            SessionState.SetString("AlicizaX.Localization.PreviewTables", string.Join(";", tables.ConvertAll(t => AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(t)))));
+            InvalidateCache();
+        }
+        internal static string Sources(string key) => string.Join(" → ", System.Linq.Enumerable.Select(
+            System.Linq.Enumerable.Where(LocalizationTableEditing.FindAll(), t => t.Keys.Contains(key)), t => t.TableId));
 
         private static void RefreshIfNeeded()
         {
             if (!_dirty) return;
             _dirty = false;
-            _settings = null;
+            _settings = AssetDatabase.LoadAssetAtPath<LocalizationSettings>(LocalizationSettings.AssetPath);
             _entries = new Dictionary<string, string>(StringComparer.Ordinal);
-
-            string optionsPath = FindRuntimeOptions();
-            if (optionsPath == null) return;
-            TextAsset asset = AssetDatabase.LoadAssetAtPath<TextAsset>(optionsPath);
-            if (asset == null) throw new InvalidOperationException("Cannot load localization runtime options: " + optionsPath);
-
-            LocalizationSettings settings = LocalizationSettings.Parse(asset.text);
-            RuntimeOptions options = JsonUtility.FromJson<RuntimeOptions>(asset.text);
-            if (options == null || options.Version != 1 || options.Catalogs == null)
-                throw new FormatException("Unsupported localization runtime options: " + optionsPath);
-
-            string directory = Path.GetDirectoryName(Path.GetFullPath(Path.Combine(
-                Path.GetDirectoryName(Application.dataPath), optionsPath)));
-            string locale = CurrentLanguage(settings);
-            var entries = new Dictionary<string, string>(StringComparer.Ordinal);
-            foreach (string template in options.Catalogs)
+            foreach (var table in LocalizationTableEditing.FindAll())
+                foreach (string key in table.Keys) _entries.TryAdd(key, null);
+            foreach (var table in PreviewTables)
             {
-                if (string.IsNullOrWhiteSpace(template))
-                    throw new FormatException("Localization runtime options have an empty catalog path: " + optionsPath);
-                string relativePath = template.Replace("{locale}", locale).Replace('/', Path.DirectorySeparatorChar);
-                string path = Path.GetFullPath(Path.Combine(directory, relativePath));
-                if (!File.Exists(path)) continue;
-                foreach (var pair in LocalizationCatalog.Read(File.ReadAllBytes(path)))
-                    if (!entries.TryAdd(pair.Key, pair.Value))
-                        throw new InvalidOperationException("Duplicate localization key in editor preview: " + pair.Key);
+                var language = table.Find(CurrentLanguage(_settings));
+                if (language == null) continue;
+                foreach (var pair in language.Read())
+                    if (pair.Value != null) _entries[pair.Key] = pair.Value;
             }
-            _settings = settings;
-            _entries = entries;
         }
 
         private static void RefreshOpenPreviews()

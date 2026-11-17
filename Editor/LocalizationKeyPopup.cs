@@ -40,7 +40,7 @@ namespace AlicizaX.Localization.Editor
                 _scroll = Vector2.zero;
             }
             if (GUI.Button(new Rect(8, 32, 70, 20), "Clear")) Choose(string.Empty);
-            GUI.Label(new Rect(90, 32, rect.width - 100, 20), _filtered.Length + " keys · " + LocalizationRefreshHelper.Language);
+            GUI.Label(new Rect(90, 32, rect.width - 100, 20), _filtered.Length + " keys 路 " + LocalizationRefreshHelper.Language);
             Rect viewport = new(0, 58, rect.width, rect.height - 58);
             if (Event.current.type == EventType.KeyDown && _filtered.Length > 0)
             {
@@ -61,7 +61,7 @@ namespace AlicizaX.Localization.Editor
                 if (i == _selected) EditorGUI.DrawRect(row, new Color(0.2f, 0.4f, 0.7f, 0.3f));
                 if (GUI.Button(row, GUIContent.none, GUIStyle.none)) Choose(_filtered[i].Key);
                 GUI.Label(new Rect(8, row.y, row.width - 12, 20), _filtered[i].Key, EditorStyles.boldLabel);
-                GUI.Label(new Rect(8, row.y + 20, row.width - 12, 20), (_filtered[i].Value ?? "(null)").Replace('\n', ' '), EditorStyles.miniLabel);
+                GUI.Label(new Rect(8, row.y + 20, row.width - 12, 20), (LocalizationRefreshHelper.Sources(_filtered[i].Key) + " · " + (_filtered[i].Value ?? "未翻译")).Replace('\n', ' '), EditorStyles.miniLabel);
             }
             GUI.EndScrollView();
         }

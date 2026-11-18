@@ -25,15 +25,15 @@ namespace AlicizaX.Localization.Tests
             _folder = "Assets/Localization/Editor/Test" + Guid.NewGuid().ToString("N");
             Directory.CreateDirectory(_folder); AssetDatabase.Refresh();
             _settings = ScriptableObject.CreateInstance<LocalizationSettings>();
-            _settings.Languages = new[] { new LanguageDefinition { Id = "cn" }, new LanguageDefinition { Id = "en" } };
-            _settings.DefaultLocale = "cn";
+            _settings.Languages = new[] { new LanguageDefinition { Id = "ChineseSimplified" }, new LanguageDefinition { Id = "English" } };
+            _settings.DefaultLocale = "ChineseSimplified";
             AssetDatabase.CreateAsset(_settings, _folder + "/Settings.asset");
             _table = Create("Test" + Guid.NewGuid().ToString("N"));
         }
         private LocalizationTableCollection Create(string id)
         {
             var table = ScriptableObject.CreateInstance<LocalizationTableCollection>();
-            table.TableId = id; table.Settings = _settings; table.AssetDirectory = _folder;
+            table.TableId = id; table.AssetDirectory = _folder;
             AssetDatabase.CreateAsset(table, _folder + "/" + id + ".asset");
             return table;
         }
@@ -46,7 +46,7 @@ namespace AlicizaX.Localization.Tests
         private void Key(string key, string cn, string en)
         {
             _table.Keys.Add(key);
-            foreach (var pair in new[] { ("cn", cn), ("en", en) })
+            foreach (var pair in new[] { ("ChineseSimplified", cn), ("English", en) })
                 if (pair.Item2 != null) LocalizationTableEditing.EnsureLanguage(_table, pair.Item1).Entries.Add(new LocalizationEntry(key, pair.Item2));
         }
         [Test]
@@ -56,33 +56,33 @@ namespace AlicizaX.Localization.Tests
             Key("test.empty", "", null);
             string csv = LocalizationCsv.Export(_table);
             var rows = LocalizationCsv.Read(_table, "\uFEFF" + csv);
-            Assert.That(rows["test.quote"]["cn"], Is.EqualTo(LocalizationTableEditing.Value(_table, "test.quote", "cn")));
-            Assert.That(rows["test.empty"]["cn"], Is.Empty);
-            Assert.That(rows["test.empty"]["en"], Is.Null);
+            Assert.That(rows["test.quote"]["ChineseSimplified"], Is.EqualTo(LocalizationTableEditing.Value(_table, "test.quote", "ChineseSimplified")));
+            Assert.That(rows["test.empty"]["ChineseSimplified"], Is.Empty);
+            Assert.That(rows["test.empty"]["English"], Is.Null);
         }
         [Test]
         public void CsvPartialImportPreservesUnmentionedValuesAndUndoRestoresChanges()
         {
             Key("test.one", "old", "english"); Key("test.two", "two", "second");
             Undo.ClearAll();
-            LocalizationCsv.Import(_table, "Key,cn\r\ntest.one,new\r\ntest.add,added\r\n");
-            Assert.That(LocalizationTableEditing.Value(_table, "test.one", "cn"), Is.EqualTo("new"));
-            Assert.That(LocalizationTableEditing.Value(_table, "test.one", "en"), Is.EqualTo("english"));
-            Assert.That(LocalizationTableEditing.Value(_table, "test.two", "cn"), Is.EqualTo("two"));
+            LocalizationCsv.Import(_table, "Key,ChineseSimplified\r\ntest.one,new\r\ntest.add,added\r\n");
+            Assert.That(LocalizationTableEditing.Value(_table, "test.one", "ChineseSimplified"), Is.EqualTo("new"));
+            Assert.That(LocalizationTableEditing.Value(_table, "test.one", "English"), Is.EqualTo("english"));
+            Assert.That(LocalizationTableEditing.Value(_table, "test.two", "ChineseSimplified"), Is.EqualTo("two"));
             Undo.FlushUndoRecordObjects(); Undo.PerformUndo();
-            Assert.That(LocalizationTableEditing.Value(_table, "test.one", "cn"), Is.EqualTo("old"));
+            Assert.That(LocalizationTableEditing.Value(_table, "test.one", "ChineseSimplified"), Is.EqualTo("old"));
             Assert.That(_table.Keys, Does.Not.Contain("test.add"));
             Undo.PerformRedo();
-            Assert.That(LocalizationTableEditing.Value(_table, "test.one", "cn"), Is.EqualTo("new"));
+            Assert.That(LocalizationTableEditing.Value(_table, "test.one", "ChineseSimplified"), Is.EqualTo("new"));
         }
         [TestCase("Key,xx\nkey,value")]
-        [TestCase("Key,cn\nkey,one\nkey,two")]
-        [TestCase("Key,cn\nkey,\"unclosed")]
+        [TestCase("Key,ChineseSimplified\nkey,one\nkey,two")]
+        [TestCase("Key,ChineseSimplified\nkey,\"unclosed")]
         public void InvalidCsvDoesNotChangeAssets(string csv)
         {
             Key("key", "old", null);
             Assert.Catch<FormatException>(() => LocalizationCsv.Import(_table, csv));
-            Assert.That(LocalizationTableEditing.Value(_table, "key", "cn"), Is.EqualTo("old"));
+            Assert.That(LocalizationTableEditing.Value(_table, "key", "ChineseSimplified"), Is.EqualTo("old"));
         }
         [Test]
         public void CrossTableFormatContractAllowsEmptyButRejectsDifferentIndexes()
@@ -90,7 +90,7 @@ namespace AlicizaX.Localization.Tests
             Key("test.format", "value {0}", "value {0}");
             var patch = Create("Patch" + Guid.NewGuid().ToString("N"));
             patch.Keys.Add("test.format");
-            var language = LocalizationTableEditing.EnsureLanguage(patch, "cn");
+            var language = LocalizationTableEditing.EnsureLanguage(patch, "ChineseSimplified");
             language.Entries.Add(new LocalizationEntry("test.format", ""));
             Assert.That(LocalizationCodeGenerator.Validate(patch)["test.format"], Is.EqualTo(1));
             language.Entries[0].Value = "{1}";
@@ -106,7 +106,7 @@ namespace AlicizaX.Localization.Tests
             {
                 LocalizationCodeGenerator.Generate(_table);
                 var before = File.GetLastWriteTimeUtc(_table.CodeOutput);
-                _table.Find("cn").Entries[0].Value = "updated";
+                _table.Find("ChineseSimplified").Entries[0].Value = "updated";
                 LocalizationCodeGenerator.Generate(_table);
                 Assert.That(File.GetLastWriteTimeUtc(_table.CodeOutput), Is.EqualTo(before));
             }
@@ -141,15 +141,15 @@ namespace AlicizaX.Localization.Tests
             Key("test.value", "中文", "English");
             LocalizationTableEditing.Commit(_table);
             AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
-            string cn = LocalizationLanguageImporter.EntryPath(_table, "cn");
-            string en = LocalizationLanguageImporter.EntryPath(_table, "en");
+            string cn = LocalizationLanguageImporter.EntryPath(_table, "ChineseSimplified");
+            string en = LocalizationLanguageImporter.EntryPath(_table, "English");
             Assert.That(AssetDatabase.LoadAllAssetsAtPath(cn).OfType<LocalizationLanguageTable>().Count(), Is.EqualTo(1));
             Assert.That(AssetDatabase.LoadAssetAtPath<LocalizationLanguageTable>(cn).Read()["test.value"], Is.EqualTo("中文"));
             Assert.That(AssetDatabase.GetDependencies(cn), Does.Not.Contain(AssetDatabase.GetAssetPath(_table)));
             Assert.That(File.ReadAllText(cn), Does.Not.Contain("中文"));
 
             // Save the source directly: the imported result must update without the window's Commit method.
-            var english = _table.Find("en");
+            var english = _table.Find("English");
             english.Entries[0].Value = "Changed";
             EditorUtility.SetDirty(english);
             AssetDatabase.SaveAssetIfDirty(english);
@@ -166,15 +166,15 @@ namespace AlicizaX.Localization.Tests
         public void CsvCreatingLanguageCanUndoAndRedoSubAssetAndRuntimeEntry()
         {
             Undo.ClearAll();
-            LocalizationCsv.Import(_table, "Key,cn\ntest.new,你好\n");
-            string entry = LocalizationLanguageImporter.EntryPath(_table, "cn");
-            Assert.That(AssetDatabase.IsSubAsset(_table.Find("cn")), Is.True);
+            LocalizationCsv.Import(_table, "Key,ChineseSimplified\ntest.new,你好\n");
+            string entry = LocalizationLanguageImporter.EntryPath(_table, "ChineseSimplified");
+            Assert.That(AssetDatabase.IsSubAsset(_table.Find("ChineseSimplified")), Is.True);
             Assert.That(File.Exists(entry), Is.True);
             Undo.FlushUndoRecordObjects(); Undo.PerformUndo();
-            Assert.That(_table.Find("cn"), Is.Null);
+            Assert.That(_table.Find("ChineseSimplified"), Is.Null);
             Assert.That(File.Exists(entry), Is.False);
             Undo.PerformRedo();
-            Assert.That(AssetDatabase.IsSubAsset(_table.Find("cn")), Is.True);
+            Assert.That(AssetDatabase.IsSubAsset(_table.Find("ChineseSimplified")), Is.True);
             Assert.That(File.Exists(entry), Is.True);
             AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
             Assert.That(AssetDatabase.LoadAssetAtPath<LocalizationLanguageTable>(entry).Read()["test.new"], Is.EqualTo("你好"));
@@ -184,18 +184,18 @@ namespace AlicizaX.Localization.Tests
         {
             Key("test.value", "中文", "English");
             LocalizationTableEditing.Commit(_table);
-            string before = LocalizationLanguageImporter.EntryPath(_table, "cn");
+            string before = LocalizationLanguageImporter.EntryPath(_table, "ChineseSimplified");
             string guid = AssetDatabase.AssetPathToGUID(before);
             _table.AssetDirectory += "/Runtime";
             LocalizationTableEditing.Commit(_table);
             Assert.That(File.Exists(before), Is.False);
-            Assert.That(AssetDatabase.AssetPathToGUID(LocalizationLanguageImporter.EntryPath(_table, "cn")), Is.EqualTo(guid));
+            Assert.That(AssetDatabase.AssetPathToGUID(LocalizationLanguageImporter.EntryPath(_table, "ChineseSimplified")), Is.EqualTo(guid));
         }
         [Test]
         public void CsvRejectsCollidingEntryNamesBeforeChangingSource()
         {
             _table.AddressTemplate = "same";
-            var error = Assert.Throws<LocalizationValidationException>(() => LocalizationCsv.Import(_table, "Key,cn,en\ntest.new,中文,English\n"));
+            var error = Assert.Throws<LocalizationValidationException>(() => LocalizationCsv.Import(_table, "Key,ChineseSimplified,English\ntest.new,中文,English\n"));
             Assert.That(error.Table, Is.SameAs(_table));
             Assert.That(error.Key, Is.Null);
             Assert.That(_table.Keys, Is.Empty);
@@ -240,8 +240,8 @@ namespace AlicizaX.Localization.Tests
                 yield return null;
                 for (int i = 0; i < 60; i++)
                 {
-                    Assert.That(LocalizationTableEditing.Value(_table, $"scroll.{i:D2}", "cn"), Is.EqualTo(edit && i == 0 ? "z" : $"Chinese {i}"), $"cn row {i}");
-                    Assert.That(LocalizationTableEditing.Value(_table, $"scroll.{i:D2}", "en"), Is.EqualTo($"English {i}"), $"en row {i}");
+                    Assert.That(LocalizationTableEditing.Value(_table, $"scroll.{i:D2}", "ChineseSimplified"), Is.EqualTo(edit && i == 0 ? "z" : $"Chinese {i}"), $"cn row {i}");
+                    Assert.That(LocalizationTableEditing.Value(_table, $"scroll.{i:D2}", "English"), Is.EqualTo($"English {i}"), $"en row {i}");
                 }
                 var selectedKey = WindowField("_key").GetValue(window);
                 window.SendEvent(new Event { type = EventType.MouseDown, button = 0, mousePosition = new Vector2(500, 700) });
@@ -264,14 +264,12 @@ namespace AlicizaX.Localization.Tests
                     foreach (var asset in new UnityEngine.Object[] { _table.Find(locale), AssetDatabase.LoadMainAssetAtPath(LocalizationLanguageImporter.EntryPath(_table, locale)) })
                     {
                         WindowField("_creating").SetValue(window, true);
-                        WindowField("_tab").SetValue(window, 1);
                         WindowField("_search").SetValue(window, "does-not-match");
                         Assert.That(OpenWindowAsset(asset), Is.True);
                         Assert.That(WindowField("_selected").GetValue(window), Is.SameAs(_table));
                         Assert.That(WindowField("_locale").GetValue(window), Is.EqualTo(locale));
                         Assert.That(WindowField("_text").GetValue(window), Is.EqualTo(LocalizationTableEditing.Value(_table, "test.open", locale)));
                         Assert.That(WindowField("_creating").GetValue(window), Is.False);
-                        Assert.That(WindowField("_tab").GetValue(window), Is.EqualTo(0));
                         Assert.That((List<string>)WindowField("_filtered").GetValue(window), Does.Contain("test.open"));
                     }
                 Assert.That(OpenWindowAsset(_table), Is.True);
@@ -307,7 +305,7 @@ namespace AlicizaX.Localization.Tests
         {
             Key("diff.same", "same", "english"); Key("diff.edit", "old", "english");
             Key("diff.remove", "old", null); Key("diff.empty", "old", null); Key("diff.keep", "keep", null);
-            string csv = "Key,cn\ndiff.same,same\ndiff.edit,new\ndiff.remove,\ndiff.empty," + new string('"', 6) + "\ndiff.new,added\ndiff.newempty,\n";
+            string csv = "Key,ChineseSimplified\ndiff.same,same\ndiff.edit,new\ndiff.remove,\ndiff.empty," + new string('"', 6) + "\ndiff.new,added\ndiff.newempty,\n";
             var plan = LocalizationCsv.Preview(_table, csv);
             Assert.That(plan.NewKeys, Is.EquivalentTo(new[] { "diff.new", "diff.newempty" }));
             Assert.That(plan.Changes.Count, Is.EqualTo(5));
@@ -315,13 +313,13 @@ namespace AlicizaX.Localization.Tests
             Assert.That(plan.Changes.Single(c => c.Key == "diff.remove").After, Is.Null);
             Assert.That(plan.Changes.Single(c => c.Key == "diff.empty").After, Is.Empty);
             Assert.That(_table.Keys.Count, Is.EqualTo(5));
-            Assert.That(LocalizationTableEditing.Value(_table, "diff.edit", "cn"), Is.EqualTo("old"));
+            Assert.That(LocalizationTableEditing.Value(_table, "diff.edit", "ChineseSimplified"), Is.EqualTo("old"));
             Undo.ClearAll();
             LocalizationCsv.Import(plan);
             foreach (var change in plan.Changes)
                 Assert.That(LocalizationTableEditing.Value(_table, change.Key, change.Locale), Is.EqualTo(change.After));
-            Assert.That(LocalizationTableEditing.Value(_table, "diff.edit", "en"), Is.EqualTo("english"));
-            Assert.That(LocalizationTableEditing.Value(_table, "diff.keep", "cn"), Is.EqualTo("keep"));
+            Assert.That(LocalizationTableEditing.Value(_table, "diff.edit", "English"), Is.EqualTo("english"));
+            Assert.That(LocalizationTableEditing.Value(_table, "diff.keep", "ChineseSimplified"), Is.EqualTo("keep"));
             Assert.That(LocalizationCsv.Preview(_table, csv).Changes, Is.Empty);
             Undo.FlushUndoRecordObjects(); Undo.PerformUndo();
             Assert.That(_table.Keys.Count, Is.EqualTo(5));
@@ -333,21 +331,21 @@ namespace AlicizaX.Localization.Tests
         public void CsvPreviewCannotOverwriteEditsMadeAfterPreview()
         {
             Key("diff.edit", "old", null);
-            var plan = LocalizationCsv.Preview(_table, "Key,cn\ndiff.edit,imported\n");
-            _table.Find("cn").Entries[0].Value = "edited after preview";
+            var plan = LocalizationCsv.Preview(_table, "Key,ChineseSimplified\ndiff.edit,imported\n");
+            _table.Find("ChineseSimplified").Entries[0].Value = "edited after preview";
             Assert.Throws<InvalidOperationException>(() => LocalizationCsv.Import(plan));
-            Assert.That(LocalizationTableEditing.Value(_table, "diff.edit", "cn"), Is.EqualTo("edited after preview"));
+            Assert.That(LocalizationTableEditing.Value(_table, "diff.edit", "ChineseSimplified"), Is.EqualTo("edited after preview"));
         }
 
         [Test]
         public void CsvErrorsReportPhysicalLineAndColumnAfterMultilineCells()
         {
             var error = Assert.Throws<LocalizationValidationException>(() => LocalizationCsv.Read(_table,
-                "Key,cn\ndiff.one,\"first\nsecond\"\ndiff.two,{0\n"));
+                "Key,ChineseSimplified\ndiff.one,\"first\nsecond\"\ndiff.two,{0\n"));
             Assert.That(error.CsvLine, Is.EqualTo(4));
             Assert.That(error.CsvColumn, Is.EqualTo(2));
             Assert.That(error.Key, Is.EqualTo("diff.two"));
-            Assert.That(error.Locale, Is.EqualTo("cn"));
+            Assert.That(error.Locale, Is.EqualTo("ChineseSimplified"));
             Assert.That(_table.Keys, Is.Empty);
         }
 
@@ -355,11 +353,11 @@ namespace AlicizaX.Localization.Tests
         public IEnumerator ValidationNavigationRevealsExactCellAndClearsFilters()
         {
             for (int i = 0; i < 60; i++) Key($"diagnostic.{i:D2}", "中文", "English");
-            _table.Find("en").Entries[59].Value = "broken {0";
+            _table.Find("English").Entries[59].Value = "broken {0";
             var error = Assert.Throws<LocalizationValidationException>(() => LocalizationCodeGenerator.Validate(_table));
             Assert.That(error.Table, Is.SameAs(_table));
             Assert.That(error.Key, Is.EqualTo("diagnostic.59"));
-            Assert.That(error.Locale, Is.EqualTo("en"));
+            Assert.That(error.Locale, Is.EqualTo("English"));
             var window = EditorWindow.GetWindow<LocalizationWindow>();
             try
             {
@@ -370,7 +368,7 @@ namespace AlicizaX.Localization.Tests
                 yield return null; yield return null;
                 Assert.That(WindowField("_selected").GetValue(window), Is.SameAs(_table));
                 Assert.That(WindowField("_key").GetValue(window), Is.EqualTo("diagnostic.59"));
-                Assert.That(WindowField("_locale").GetValue(window), Is.EqualTo("en"));
+                Assert.That(WindowField("_locale").GetValue(window), Is.EqualTo("English"));
                 Assert.That(WindowField("_text").GetValue(window), Is.EqualTo("broken {0"));
                 Assert.That(((Vector2)WindowField("_scroll").GetValue(window)).y, Is.GreaterThan(0));
             }

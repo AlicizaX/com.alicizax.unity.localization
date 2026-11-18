@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using System.Linq;
 using AlicizaX.Localization.Runtime;
 using UnityEditor;
@@ -11,6 +10,13 @@ namespace AlicizaX.Localization.Editor
     internal static class LocalizationSettingsProvider
     {
         internal const string SettingsPath = "Project/AlicizaX/Localization";
+        [InitializeOnLoadMethod]
+        private static void SaveAfterUndo() => Undo.undoRedoPerformed += () =>
+        {
+            var settings = LocalizationSettings.Current;
+            if (settings != null && EditorUtility.IsDirty(settings)) settings.SaveProjectSettings();
+        };
+
         [MenuItem("AlicizaX/Localization/Settings")]
         internal static void OpenSettings() => SettingsService.OpenProjectSettings(SettingsPath);
 
@@ -39,27 +45,21 @@ namespace AlicizaX.Localization.Editor
 
         private static void Draw()
         {
-            var settings = AssetDatabase.LoadAssetAtPath<LocalizationSettings>(LocalizationSettings.AssetPath);
+            var settings = LocalizationSettings.Current;
             if (settings == null)
             {
                 if (GUILayout.Button("创建设置"))
                 {
-                    Directory.CreateDirectory(Path.GetDirectoryName(LocalizationSettings.AssetPath));
-                    AssetDatabase.Refresh();
-                    settings = ScriptableObject.CreateInstance<LocalizationSettings>();
-                    settings.Languages = new[] { new LanguageDefinition { Id = "zh-Hans", LocaleCode = "zh-Hans", DisplayName = "简体中文" } };
-                    settings.DefaultLocale = settings.Languages[0].Id;
-                    AssetDatabase.CreateAsset(settings, LocalizationSettings.AssetPath);
-                    Undo.RegisterCreatedObjectUndo(settings, "Create localization settings");
-                    AssetDatabase.SaveAssets();
+                    LocalizationSettings.CreateProjectSettings();
+                    LocalizationRefreshHelper.InvalidateCache();
                 }
                 return;
             }
-            EditorGUILayout.ObjectField("设置资产", settings, typeof(LocalizationSettings), false);
+            EditorGUILayout.LabelField("设置文件", LocalizationSettings.ProjectPath);
             var serialized = new SerializedObject(settings);
             serialized.Update();
             var languages = serialized.FindProperty("Languages");
-            var tables = LocalizationTableEditing.FindAll().Where(t => t.Settings == settings).ToArray();
+            var tables = LocalizationTableEditing.FindAll();
             GUILayout.Space(8);
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
             EditorGUILayout.LabelField("支持的语言", EditorStyles.boldLabel);
@@ -118,7 +118,7 @@ namespace AlicizaX.Localization.Editor
             EditorGUILayout.EndVertical();
             if (serialized.ApplyModifiedProperties())
             {
-                AssetDatabase.SaveAssetIfDirty(settings);
+                settings.SaveProjectSettings();
                 LocalizationRefreshHelper.InvalidateCache();
             }
             try { settings.Validate(); }

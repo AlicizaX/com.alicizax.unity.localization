@@ -46,7 +46,7 @@ namespace AlicizaX.Localization.Editor
                 settings.Languages = candidate.Languages;
                 settings.DefaultLocale = candidate.DefaultLocale;
                 EditorUtility.SetDirty(settings);
-                AssetDatabase.SaveAssetIfDirty(settings);
+                if (settings == LocalizationSettings.Current) settings.SaveProjectSettings();
                 LocalizationRefreshHelper.InvalidateCache();
             }
             finally { DestroyImmediate(candidate); }

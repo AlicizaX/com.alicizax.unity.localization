@@ -30,6 +30,8 @@ namespace AlicizaX.Localization.Runtime
         public static IReadOnlyList<LocalizationLanguageTable> LoadedTables => CheckInitialized() ? _provider.LoadedTables : Array.Empty<LocalizationLanguageTable>();
         public static LocalizationSettings Settings { get; private set; }
 
+        public static void Initialize() => Initialize(LocalizationSettings.Current);
+
         public static void Initialize(LocalizationSettings settings, string initialLanguage = null)
         {
             if (settings == null)

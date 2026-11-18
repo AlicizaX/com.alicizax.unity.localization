@@ -7,7 +7,7 @@ namespace AlicizaX.Localization.Editor
     public sealed class LocalizationTableCollection : ScriptableObject
     {
         public string TableId;
-        public LocalizationSettings Settings;
+        public LocalizationSettings Settings => LocalizationSettings.Current;
         public List<string> Keys = new();
         public List<LocalizationLanguageTable> Tables = new();
         public string AssetDirectory = "Assets/Bundles/Configs/sciptableObject";

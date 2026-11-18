@@ -72,24 +72,6 @@ namespace AlicizaX.Localization.Editor
             return settings.Supports(language) ? language : settings.DefaultLocale;
         }
 
-        internal static List<LocalizationTableCollection> PreviewTables
-        {
-            get
-            {
-                var result = new List<LocalizationTableCollection>();
-                foreach (string guid in SessionState.GetString("AlicizaX.Localization.PreviewTables", "").Split(';'))
-                {
-                    var table = AssetDatabase.LoadAssetAtPath<LocalizationTableCollection>(AssetDatabase.GUIDToAssetPath(guid));
-                    if (table != null) result.Add(table);
-                }
-                return result;
-            }
-        }
-        internal static void SetPreviewTables(List<LocalizationTableCollection> tables)
-        {
-            SessionState.SetString("AlicizaX.Localization.PreviewTables", string.Join(";", tables.ConvertAll(t => AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(t)))));
-            InvalidateCache();
-        }
         internal static string Sources(string key) => string.Join(" → ", System.Linq.Enumerable.Select(
             System.Linq.Enumerable.Where(LocalizationTableEditing.FindAll(), t => t.Keys.Contains(key)), t => t.TableId));
 
@@ -97,13 +79,13 @@ namespace AlicizaX.Localization.Editor
         {
             if (!_dirty) return;
             _dirty = false;
-            _settings = AssetDatabase.LoadAssetAtPath<LocalizationSettings>(LocalizationSettings.AssetPath);
+            _settings = LocalizationSettings.Current;
             _entries = new Dictionary<string, string>(StringComparer.Ordinal);
+            string locale = CurrentLanguage(_settings);
             foreach (var table in LocalizationTableEditing.FindAll())
-                foreach (string key in table.Keys) _entries.TryAdd(key, null);
-            foreach (var table in PreviewTables)
             {
-                var language = table.Find(CurrentLanguage(_settings));
+                foreach (string key in table.Keys) _entries.TryAdd(key, null);
+                var language = table.Find(locale);
                 if (language == null) continue;
                 foreach (var pair in language.Read())
                     if (pair.Value != null) _entries[pair.Key] = pair.Value;

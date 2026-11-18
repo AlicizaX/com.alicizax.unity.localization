@@ -8,7 +8,39 @@ namespace AlicizaX.Localization.Runtime
     {
         public const string EditorLanguagePrefsKey = "AlicizaX.Localization.Editor.Language";
 
-        public const string AssetPath = "Assets/Resources/Localization/Settings.asset";
+        private static LocalizationSettings _current;
+
+#if UNITY_EDITOR
+        public const string ProjectPath = "ProjectSettings/LocalizationSettings.asset";
+        public static LocalizationSettings Current
+        {
+            get
+            {
+                if (_current == null && System.IO.File.Exists(ProjectPath))
+                    _current = Array.Find(UnityEditorInternal.InternalEditorUtility.LoadSerializedFileAndForget(ProjectPath),
+                        obj => obj is LocalizationSettings) as LocalizationSettings;
+                return _current;
+            }
+        }
+
+        public static void CreateProjectSettings()
+        {
+            _current = CreateInstance<LocalizationSettings>();
+            _current.Languages = new[] { new LanguageDefinition { Id = "zh-Hans", LocaleCode = "zh-Hans", DisplayName = "简体中文" } };
+            _current.DefaultLocale = "zh-Hans";
+            _current.SaveProjectSettings();
+        }
+
+        public void SaveProjectSettings()
+        {
+            UnityEditorInternal.InternalEditorUtility.SaveToSerializedFileAndForget(new UnityEngine.Object[] { this }, ProjectPath, true);
+            UnityEditor.EditorUtility.ClearDirty(this);
+        }
+#else
+        internal static LocalizationSettings Current => _current;
+        private void OnEnable() => _current = this;
+#endif
+
         public LanguageDefinition[] Languages = Array.Empty<LanguageDefinition>();
         public string DefaultLocale;
         public bool UseSystemLanguage;

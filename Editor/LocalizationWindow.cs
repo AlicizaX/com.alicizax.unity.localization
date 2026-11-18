@@ -6,7 +6,6 @@ using System.Text;
 using AlicizaX.Localization.Runtime;
 using UnityEditor;
 using UnityEditor.Callbacks;
-using UnityEditorInternal;
 using UnityEngine;
 
 namespace AlicizaX.Localization.Editor
@@ -15,9 +14,7 @@ namespace AlicizaX.Localization.Editor
     {
         [SerializeField] private LocalizationTableCollection _selected;
         private LocalizationTableCollection[] _tables = Array.Empty<LocalizationTableCollection>();
-        private List<LocalizationTableCollection> _preview;
-        private ReorderableList _order;
-        private Vector2 _scroll, _listScroll, _previewScroll, _optionsScroll;
+        private Vector2 _scroll, _listScroll, _optionsScroll;
         private string _search = "", _newKey = "", _key, _locale, _text = "", _error;
         private string _validationError;
         private LocalizationValidationException _diagnostic, _validationDiagnostic;
@@ -25,7 +22,6 @@ namespace AlicizaX.Localization.Editor
         private bool _missing, _options, _creating;
         private string _newId = "NewTable", _directory = "Assets/Bundles/Configs/sciptableObject", _code = "";
         private string _sourceDirectory = "Assets";
-        private int _tab;
         private List<string> _filtered = new();
 
         [MenuItem("AlicizaX/Localization/Tables")]
@@ -36,7 +32,6 @@ namespace AlicizaX.Localization.Editor
             var window = GetWindow<LocalizationWindow>("Localization");
             if (Event.current != null) GUI.FocusControl(null);
             window._selected = table;
-            window._tab = 0;
             window._creating = false;
             window._search = "";
             window._missing = false;
@@ -58,7 +53,6 @@ namespace AlicizaX.Localization.Editor
             string path = AssetDatabase.GetAssetPath(Selection.activeObject);
             window._sourceDirectory = string.IsNullOrEmpty(path) || !path.StartsWith("Assets", StringComparison.Ordinal) ? "Assets"
                 : AssetDatabase.IsValidFolder(path) ? path : Path.GetDirectoryName(path).Replace('\\', '/');
-            window._tab = 0;
             window._creating = true;
             window.Repaint();
         }
@@ -85,7 +79,6 @@ namespace AlicizaX.Localization.Editor
             if (table == null) return false;
             var window = GetWindow<LocalizationWindow>("Localization");
             window._selected = table;
-            window._tab = 0;
             window._creating = false;
             window._search = "";
             window._missing = false;
@@ -101,12 +94,6 @@ namespace AlicizaX.Localization.Editor
             minSize = new Vector2(960, 720);
             LocalizationRefreshHelper.Changed += Refresh;
             Refresh();
-            _preview = LocalizationRefreshHelper.PreviewTables;
-            _order = new ReorderableList(_preview, typeof(LocalizationTableCollection), true, true, false, true);
-            _order.drawHeaderCallback = rect => EditorGUI.LabelField(rect, "模拟加入顺序（越靠后优先）");
-            _order.drawElementBackgroundCallback = (rect, index, active, focused) => EditorGUI.DrawRect(rect, active ? Selected : RowColor(index));
-            _order.drawElementCallback = (rect, index, active, focused) => EditorGUI.LabelField(rect, $"{index + 1}. {_preview[index].TableId}");
-            _order.onChangedCallback = _ => LocalizationRefreshHelper.SetPreviewTables(_preview);
         }
         private void OnDisable() => LocalizationRefreshHelper.Changed -= Refresh;
         private void Refresh()
@@ -146,13 +133,12 @@ namespace AlicizaX.Localization.Editor
         private static Color Divider => Tone(.31f, .65f);
         private static Color Selected => Tone(.32f, .72f);
         private static Color RowColor(int row) => row % 2 == 0 ? Canvas : Tone(.19f, .94f);
-        private GUIStyle _titleStyle, _rowStyle, _detailStyle, _tabStyle;
+        private GUIStyle _titleStyle, _rowStyle, _detailStyle;
         private void Styles()
         {
             _titleStyle ??= new GUIStyle(EditorStyles.boldLabel) { fontSize = 15, alignment = TextAnchor.MiddleLeft };
             _rowStyle ??= new GUIStyle(EditorStyles.label) { alignment = TextAnchor.MiddleLeft, padding = new RectOffset(10, 8, 0, 0), clipping = TextClipping.Clip };
             _detailStyle ??= new GUIStyle { padding = new RectOffset(10, 10, 10, 10) };
-            _tabStyle ??= new GUIStyle(EditorStyles.label) { alignment = TextAnchor.MiddleCenter };
         }
         private static Rect Inset(Rect rect, float amount) => new(rect.x + amount, rect.y + amount, Mathf.Max(1, rect.width - amount * 2), Mathf.Max(1, rect.height - amount * 2));
         private static void Outline(Rect rect, Color color)
@@ -168,13 +154,6 @@ namespace AlicizaX.Localization.Editor
             EditorGUI.DrawRect(new Rect(0, 0, position.width, position.height), Canvas);
             EditorGUI.DrawRect(new Rect(0, 0, position.width, 42), Header);
             GUI.Label(new Rect(14, 6, 190, 30), "Localization", _titleStyle);
-            for (int i = 0; i < 2; i++)
-            {
-                var tab = new Rect(222 + i * 105, 9, 105, 25);
-                EditorGUI.DrawRect(tab, _tab == i ? Selected : Canvas);
-                Outline(tab, Divider);
-                if (GUI.Button(tab, i == 0 ? "词库编辑" : "叠加预览", _tabStyle)) _tab = i;
-            }
             if (GUI.Button(new Rect(position.width - 135, 9, 120, 25), "语言设置 ↗")) LocalizationSettingsProvider.OpenSettings();
             float top = 43;
             string error = _error ?? _validationError;
@@ -191,7 +170,6 @@ namespace AlicizaX.Localization.Editor
                 top += 48;
             }
             var body = new Rect(0, top, position.width, position.height - top);
-            if (_tab == 1) { DrawPreview(body); return; }
             var side = new Rect(body.x, body.y, 210, body.height);
             EditorGUI.DrawRect(side, Sidebar);
             EditorGUI.DrawRect(new Rect(side.xMax, side.y, 1, side.height), Divider);
@@ -290,13 +268,12 @@ namespace AlicizaX.Localization.Editor
             _code = EditorGUILayout.TextField("常量代码输出", _code);
             if (GUILayout.Button("创建")) Run(() =>
             {
-                var settings = AssetDatabase.LoadAssetAtPath<LocalizationSettings>(LocalizationSettings.AssetPath);
-                if (settings == null) throw new InvalidOperationException("请先创建全局语言设置。");
+                if (LocalizationSettings.Current == null) throw new InvalidOperationException("请先创建全局语言设置。");
                 if (string.IsNullOrWhiteSpace(_newId) || _tables.Any(t => t.TableId == _newId)) throw new ArgumentException("TableId 不能为空或重复。");
                 string path = EditorUtility.SaveFilePanelInProject("创建 Localization Table", _newId, "asset", "选择 Table 的保存位置", _sourceDirectory);
                 if (path.Length == 0) return;
                 var table = CreateInstance<LocalizationTableCollection>();
-                table.TableId = _newId; table.Settings = settings; table.AssetDirectory = _directory; table.CodeOutput = _code;
+                table.TableId = _newId; table.AssetDirectory = _directory; table.CodeOutput = _code;
                 AssetDatabase.CreateAsset(table, AssetDatabase.GenerateUniqueAssetPath(path));
                 Undo.RegisterCreatedObjectUndo(table, "Create localization table");
                 _selected = table; _creating = false;
@@ -425,69 +402,6 @@ namespace AlicizaX.Localization.Editor
         {
             string path = EditorUtility.SaveFilePanel("导出 CSV", "", _selected.TableId, "csv");
             if (path.Length != 0) File.WriteAllText(path, LocalizationCsv.Export(_selected), new UTF8Encoding(true));
-        }
-        private void DrawPreview(Rect body)
-        {
-            var side = new Rect(body.x, body.y, 245, body.height);
-            EditorGUI.DrawRect(side, Sidebar);
-            EditorGUI.DrawRect(new Rect(side.xMax, side.y, 1, side.height), Divider);
-            GUILayout.BeginArea(Inset(side, 12));
-            GUILayout.Label(Application.isPlaying ? "实际加载顺序" : "预览组合", _titleStyle, GUILayout.Height(30));
-            if (!Application.isPlaying)
-            {
-                var locales = LocalizationRefreshHelper.Languages.ToArray();
-                int index = Array.IndexOf(locales, LocalizationRefreshHelper.Language);
-                int next = EditorGUILayout.Popup(index, locales);
-                if (next >= 0 && next != index) LocalizationRefreshHelper.SetLanguage(locales[next]);
-                GUILayout.Space(12);
-                _order.DoLayoutList();
-                if (GUILayout.Button("+ 添加 Table", GUILayout.Height(26)))
-                {
-                    var menu = new GenericMenu();
-                    foreach (var table in _tables.Where(t => !_preview.Contains(t))) menu.AddItem(new GUIContent(table.TableId), false, () => { _preview.Add(table); LocalizationRefreshHelper.SetPreviewTables(_preview); });
-                    menu.ShowAsContext();
-                }
-            }
-            else
-            {
-                GUILayout.Label(LocalizationKit.CurrentLanguage, EditorStyles.miniLabel);
-                int order = 0;
-                foreach (var table in LocalizationKit.LoadedTables) GUILayout.Label($"{++order}. {table.TableId}", GUILayout.Height(28));
-            }
-            GUILayout.EndArea();
-            var content = new Rect(side.xMax + 12, body.y + 12, body.width - side.width - 24, body.height - 24);
-            GUILayout.BeginArea(content);
-            GUILayout.Label("最终文本与来源", _titleStyle, GUILayout.Height(30));
-            var loaded = Application.isPlaying ? LocalizationKit.LoadedTables.ToList() : _preview.Select(t => t.Find(LocalizationRefreshHelper.Language)).Where(t => t != null).ToList();
-            var values = new Dictionary<string, List<(LocalizationLanguageTable table, string value)>>(StringComparer.Ordinal);
-            foreach (var table in loaded)
-                foreach (var entry in table.Entries)
-                {
-                    if (entry.Value == null) continue;
-                    if (!values.TryGetValue(entry.Key, out var list)) values.Add(entry.Key, list = new());
-                    list.Add((table, entry.Value));
-                }
-            if (values.Count == 0) EditorGUILayout.HelpBox("添加 Table 后显示叠加结果。拖动左侧列表可调整预览顺序。", MessageType.Info);
-            _previewScroll = EditorGUILayout.BeginScrollView(_previewScroll);
-            int rowIndex = 0;
-            foreach (var pair in values.OrderBy(p => p.Key, StringComparer.Ordinal))
-            {
-                var winner = pair.Value[pair.Value.Count - 1];
-                Rect row = GUILayoutUtility.GetRect(1, pair.Value.Count > 1 ? 74 : 52, GUILayout.ExpandWidth(true));
-                EditorGUI.DrawRect(row, RowColor(rowIndex++));
-                if (GUI.Button(row, GUIContent.none, GUIStyle.none))
-                {
-                    _selected = _tables.FirstOrDefault(t => t.TableId == winner.table.TableId);
-                    _key = pair.Key; _locale = winner.table.Locale; _text = winner.value; _tab = 0; Filter();
-                }
-                GUI.Label(new Rect(row.x + 8, row.y + 4, row.width - 170, 20), pair.Key, EditorStyles.boldLabel);
-                GUI.Label(new Rect(row.xMax - 155, row.y + 4, 150, 20), winner.table.TableId, EditorStyles.miniLabel);
-                GUI.Label(new Rect(row.x + 8, row.y + 26, row.width - 16, 20), new GUIContent(winner.value.Replace('\n', ' '), winner.value));
-                if (pair.Value.Count > 1) GUI.Label(new Rect(row.x + 8, row.y + 48, row.width - 16, 20), string.Join(" → ", pair.Value.Select(v => v.table.TableId + ": " + v.value)), EditorStyles.miniLabel);
-                GUILayout.Space(2);
-            }
-            EditorGUILayout.EndScrollView();
-            GUILayout.EndArea();
         }
     }
 }

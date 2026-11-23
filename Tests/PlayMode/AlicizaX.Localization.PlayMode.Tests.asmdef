@@ -6,6 +6,7 @@
         "AlicizaX.Localization.UI",
         "UniTask.Runtime",
         "Unity.TextMeshPro",
+        "UnityEngine.UI",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

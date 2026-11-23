@@ -245,14 +245,21 @@ namespace AlicizaX.Localization.Tests
             binding.Dispose(); Switch("B"); Assert.That(calls, Is.Zero);
         }
         [UnityTest]
-        public IEnumerator LocalizedTextRefreshesAndResubscribesAfterEnable()
+        public IEnumerator LocalizedTMPTextRefreshesAndResubscribesAfterEnable()
         {
-            Add("Base", new Source("Base"));
-            var go = new GameObject("LocalizedText Test", typeof(RectTransform), typeof(TextMeshProUGUI), typeof(LocalizedText));
+            var source = new Source("Base");
+            source.Values.Add("count", "Count: {0}");
+            Add("Base", source);
+            var go = new GameObject("LocalizedTMPText Test", typeof(RectTransform), typeof(TextMeshProUGUI), typeof(LocalizedTMPText));
             try
             {
                 var text = go.GetComponent<TextMeshProUGUI>();
-                go.GetComponent<LocalizedText>().SetKey("title");
+                var binding = go.GetComponent<LocalizedTMPText>();
+                binding.SetKey("title");
+                Assert.That(text.text, Is.EqualTo("Base A"));
+                binding.SetContent("count", 3);
+                Assert.That(text.text, Is.EqualTo("Count: 3"));
+                binding.SetContent("title");
                 Assert.That(text.text, Is.EqualTo("Base A"));
                 Switch("B"); Assert.That(text.text, Is.EqualTo("Base B"));
                 go.SetActive(false); Switch("A"); Assert.That(text.text, Is.EqualTo("Base B"));
@@ -261,6 +268,30 @@ namespace AlicizaX.Localization.Tests
             finally { UnityEngine.Object.Destroy(go); }
             yield return null;
         }
+
+        [UnityTest]
+        public IEnumerator LocalizedUGUITextFormatsAndRefreshesOnLanguageChange()
+        {
+            var source = new Source("Base");
+            source.Values.Add("count", "Count: {0}");
+            Add("Base", source);
+            var go = new GameObject("LocalizedUGUIText Test", typeof(RectTransform), typeof(UnityEngine.UI.Text), typeof(LocalizedUGUIText));
+            try
+            {
+                var text = go.GetComponent<UnityEngine.UI.Text>();
+                LocalizedTextBase binding = go.GetComponent<LocalizedUGUIText>();
+                binding.SetContent("count", 3);
+                Assert.That(text.text, Is.EqualTo("Count: 3"));
+                binding.SetArguments(7);
+                Assert.That(text.text, Is.EqualTo("Count: 7"));
+                binding.SetContent("title");
+                Assert.That(text.text, Is.EqualTo("Base A"));
+                Switch("B"); Assert.That(text.text, Is.EqualTo("Base B"));
+            }
+            finally { UnityEngine.Object.Destroy(go); }
+            yield return null;
+        }
+
         private sealed class Source : ILocalizationTableSource
         {
             private readonly string _id;

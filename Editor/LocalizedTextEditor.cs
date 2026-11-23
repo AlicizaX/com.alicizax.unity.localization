@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace AlicizaX.Localization.Editor
 {
-    [CustomEditor(typeof(LocalizedText))]
+    [CustomEditor(typeof(LocalizedTMPText))]
     [CanEditMultipleObjects]
     internal sealed class LocalizedTextEditor : UnityEditor.Editor
     {
@@ -46,7 +46,7 @@ namespace AlicizaX.Localization.Editor
                 LocalizationRefreshHelper.InvalidateCache();
                 foreach (UnityEngine.Object selected in targets)
                 {
-                    Preview((LocalizedText)selected);
+                    Preview((LocalizedTMPText)selected);
                 }
             }
         }
@@ -55,13 +55,13 @@ namespace AlicizaX.Localization.Editor
         {
             foreach (UnityEngine.Object selected in targets)
             {
-                var binding = (LocalizedText)selected;
+                var binding = (LocalizedTMPText)selected;
                 if (Application.isPlaying) binding.Refresh();
                 else Preview(binding);
             }
         }
 
-        internal static void Preview(LocalizedText binding)
+        internal static void Preview(LocalizedTMPText binding)
         {
             if (binding == null || Application.isPlaying || EditorUtility.IsPersistent(binding)) return;
             var serialized = new SerializedObject(binding);

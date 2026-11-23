@@ -97,7 +97,7 @@ namespace AlicizaX.Localization.Editor
             _refreshScheduled = false;
             if (Application.isPlaying) return;
 #if TEXTMESHPRO_SUPPORT
-            foreach (LocalizedText binding in Resources.FindObjectsOfTypeAll<LocalizedText>())
+            foreach (LocalizedTMPText binding in Resources.FindObjectsOfTypeAll<LocalizedTMPText>())
                 if (!EditorUtility.IsPersistent(binding) && binding.gameObject.scene.IsValid())
                     LocalizedTextEditor.Preview(binding);
 #endif

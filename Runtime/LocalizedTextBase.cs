@@ -1,17 +1,12 @@
-#if TEXTMESHPRO_SUPPORT
 using System;
 using AlicizaX.Localization.Runtime;
 using Cysharp.Text;
-using TMPro;
 using UnityEngine;
 
 namespace AlicizaX.Localization.UI
 {
-    [DisallowMultipleComponent]
-    [AddComponentMenu("Localization/Localized Text")]
-    public sealed class LocalizedText : MonoBehaviour
+    public abstract class LocalizedTextBase : MonoBehaviour
     {
-        [SerializeField] private TMP_Text _target;
         [SerializeField] private string _key;
         [SerializeField] private string[] _arguments = Array.Empty<string>();
 
@@ -21,12 +16,9 @@ namespace AlicizaX.Localization.UI
 
         public string Key => _key;
 
-        private void Awake()
-        {
-            if (_target == null) _target = GetComponent<TMP_Text>();
-        }
+        protected abstract bool HasTarget { get; }
 
-        private void OnEnable()
+        protected void OnEnable()
         {
             if (!Application.isPlaying) return;
             LocalizationKit.Changed += OnLanguageChanged;
@@ -34,7 +26,7 @@ namespace AlicizaX.Localization.UI
             Refresh();
         }
 
-        private void OnDisable()
+        protected void OnDisable()
         {
             if (!_subscribed) return;
             LocalizationKit.Changed -= OnLanguageChanged;
@@ -68,14 +60,14 @@ namespace AlicizaX.Localization.UI
         public void Refresh()
         {
             if (!Application.isPlaying || !isActiveAndEnabled || string.IsNullOrEmpty(_key)) return;
-            if (_target == null) return;
+            if (!HasTarget) return;
 
             string format = LocalizationKit.Get(_key);
             object[] arguments = _runtimeArguments ?? _arguments;
             if (arguments == null || arguments.Length == 0)
             {
                 if (string.Equals(format, _lastText, StringComparison.Ordinal)) return;
-                _target.SetText(format);
+                ApplyText(format);
                 _lastText = format;
                 return;
             }
@@ -85,11 +77,16 @@ namespace AlicizaX.Localization.UI
             {
                 LocalizationFormatter.AppendFormat(ref builder, format, arguments);
                 var text = builder.AsArraySegment();
-                _target.SetCharArray(text.Array, text.Offset, text.Count);
+                ApplyText(text.Array, text.Offset, text.Count);
                 _lastText = null;
             }
             finally { builder.Dispose(); }
         }
+
+        protected abstract void ApplyText(string text);
+
+        // Consume or copy the borrowed buffer before returning.
+        protected virtual void ApplyText(char[] buffer, int offset, int count)
+            => ApplyText(new string(buffer, offset, count));
     }
 }
-#endif

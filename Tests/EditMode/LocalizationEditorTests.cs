@@ -6,6 +6,7 @@ using System.Linq;
 using System.Reflection;
 using AlicizaX.Localization.Editor;
 using AlicizaX.Localization.Runtime;
+using AlicizaX.Localization.UI;
 using Cysharp.Threading.Tasks;
 using NUnit.Framework;
 using UnityEditor;
@@ -49,6 +50,28 @@ namespace AlicizaX.Localization.Tests
             foreach (var pair in new[] { ("ChineseSimplified", cn), ("English", en) })
                 if (pair.Item2 != null) LocalizationTableEditing.EnsureLanguage(_table, pair.Item1).Entries.Add(new LocalizationEntry(key, pair.Item2));
         }
+        [TestCase(typeof(LocalizedUGUIText))]
+        [TestCase(typeof(LocalizedTMPText))]
+        public void LocalizedTextUsesKeyPickerInspector(Type componentType)
+        {
+            var go = new GameObject("Localized Text Inspector Test");
+            UnityEditor.Editor inspector = null;
+            try
+            {
+                var binding = go.AddComponent(componentType);
+                inspector = UnityEditor.Editor.CreateEditor(binding);
+
+                Assert.That(inspector, Is.Not.Null);
+                Assert.That(inspector.GetType().Name, Is.EqualTo("LocalizedTextEditor"));
+                Assert.That(inspector.serializedObject.FindProperty("_key"), Is.Not.Null);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(inspector);
+                UnityEngine.Object.DestroyImmediate(go);
+            }
+        }
+
         [Test]
         public void CsvRoundTripPreservesWhitespaceQuotesNewlinesAndEmptyState()
         {

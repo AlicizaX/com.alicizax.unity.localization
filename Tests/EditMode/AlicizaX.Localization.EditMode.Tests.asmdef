@@ -3,6 +3,7 @@
     "references": [
         "AlicizaX.Localization.Runtime",
         "AlicizaX.Localization.Editor",
+        "AlicizaX.Localization.UI",
         "UniTask.Runtime",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"

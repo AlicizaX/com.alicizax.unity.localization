@@ -2,24 +2,27 @@
 using System;
 using System.Reflection;
 using AlicizaX.Localization.Runtime;
-using AlicizaX.Localization.UI;
 using TMPro;
+#endif
+using AlicizaX.Localization.UI;
 using UnityEditor;
 using UnityEngine;
 
 namespace AlicizaX.Localization.Editor
 {
-    [CustomEditor(typeof(LocalizedTMPText))]
+    [CustomEditor(typeof(LocalizedTextBase), true)]
     [CanEditMultipleObjects]
     internal sealed class LocalizedTextEditor : UnityEditor.Editor
     {
+#if TEXTMESHPRO_SUPPORT
         private static readonly FieldInfo TextField = typeof(TMP_Text).GetField("m_text", BindingFlags.Instance | BindingFlags.NonPublic);
         private static readonly FieldInfo BackingDirtyField = typeof(TMP_Text).GetField("m_IsTextBackingStringDirty", BindingFlags.Instance | BindingFlags.NonPublic);
+#endif
 
         public override void OnInspectorGUI()
         {
             serializedObject.Update();
-            EditorGUILayout.PropertyField(serializedObject.FindProperty("_target"));
+            DrawPropertiesExcluding(serializedObject, "m_Script", "_key", "_arguments");
             SerializedProperty key = serializedObject.FindProperty("_key");
             Rect keyRect = EditorGUILayout.GetControlRect();
             EditorGUI.BeginProperty(keyRect, new GUIContent("Language Key"), key);
@@ -41,26 +44,30 @@ namespace AlicizaX.Localization.Editor
             bool changed = serializedObject.ApplyModifiedProperties();
             if (changed) RefreshSelection();
 
-            if (GUILayout.Button("Refresh Preview"))
+#if TEXTMESHPRO_SUPPORT
+            if (target is LocalizedTMPText && GUILayout.Button("Refresh Preview"))
             {
                 LocalizationRefreshHelper.InvalidateCache();
                 foreach (UnityEngine.Object selected in targets)
                 {
-                    Preview((LocalizedTMPText)selected);
+                    if (selected is LocalizedTMPText binding) Preview(binding);
                 }
             }
+#endif
         }
 
         private void RefreshSelection()
         {
-            foreach (UnityEngine.Object selected in targets)
+            foreach (LocalizedTextBase binding in targets)
             {
-                var binding = (LocalizedTMPText)selected;
                 if (Application.isPlaying) binding.Refresh();
-                else Preview(binding);
+#if TEXTMESHPRO_SUPPORT
+                else if (binding is LocalizedTMPText tmpBinding) Preview(tmpBinding);
+#endif
             }
         }
 
+#if TEXTMESHPRO_SUPPORT
         internal static void Preview(LocalizedTMPText binding)
         {
             if (binding == null || Application.isPlaying || EditorUtility.IsPersistent(binding)) return;
@@ -100,6 +107,6 @@ namespace AlicizaX.Localization.Editor
             TextField.SetValue(target, original);
             BackingDirtyField.SetValue(target, false);
         }
+#endif
     }
 }
-#endif

@@ -1,7 +1,7 @@
 {
   "name": "com.alicizax.unity.localization",
   "displayName": "Aliciza X Localization",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "unity": "2022.3",
   "category": "Aliciza X",
   "description": "ScriptableObject localization sources, per-language imported assets, layered loading and CSV editing.",

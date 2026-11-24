@@ -78,9 +78,7 @@ namespace AlicizaX.Localization.Runtime
             if (_provider.Revision != revision) Publish(false);
         }
 
-        public static UniTask ReloadTableAsync(string tableId) => ReloadTableAsync(tableId, null);
-
-        public static async UniTask ReloadTableAsync(string tableId, ILocalizationTableSource replacementSource)
+        public static async UniTask ReloadTableAsync(string tableId, ILocalizationTableSource replacementSource = null)
         {
             if (!CheckInitialized()) return;
             int revision = _provider.Revision;
@@ -88,12 +86,12 @@ namespace AlicizaX.Localization.Runtime
             if (_provider.Revision != revision) Publish(false);
         }
 
-        public static async UniTask SetLanguageAsync(string locale)
+        public static async UniTask SetLanguageAsync(string locale, bool persistLanguage = true)
         {
             if (!CheckInitialized()) return;
             int revision = _provider.Revision;
             await _provider.SetLanguageAsync(locale);
-            if (_provider.Revision != revision) Publish(true);
+            if (_provider.Revision != revision) Publish(persistLanguage);
         }
 
         public static IDisposable SubscribeChanged(Action<string> callback)
